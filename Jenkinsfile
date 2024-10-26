@@ -41,7 +41,7 @@ pipeline {
                     sh 'docker tag notes-app:latest $dockerHubUser/notes-app:latest'
                     sh 'docker push $dockerHubUser/notes-app:latest'
                 }
-                echo 'Docker image pushed to Docker Hub successfully'
+                echo 'Docker image pushed to Docker Hub successfully hello'
             }
         }
 
