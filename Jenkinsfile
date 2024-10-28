@@ -1,8 +1,7 @@
-
 pipeline {
     agent { label 'vinod' }
 
-    
+    stages {
         stage('Clone Code') {
             steps {
                 echo 'Cloning the code from GitHub'
@@ -34,14 +33,14 @@ pipeline {
                     sh 'docker tag notes-app:latest $dockerHubUser/notes-app:latest'
                     sh 'docker push $dockerHubUser/notes-app:latest'
                 }
-                echo 'Docker image pushed to Docker Hub successfully hello'
+                echo 'Docker image pushed to Docker Hub successfully'
             }
         }
 
         stage('Deploy') {
             steps {
                 echo 'Deploying application using Docker Compose'
-                sh ' docker compose down && docker compose up -d'
+                sh 'docker compose down && docker compose up -d'
             }
         }
     }
