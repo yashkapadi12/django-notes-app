@@ -1,15 +1,8 @@
-@Library('Shared') _
+
 pipeline {
     agent { label 'vinod' }
 
-    stages {
-        stage('Hello'){
-            steps{
-                script{
-                    hello()
-                }
-            }
-        }
+    
         stage('Clone Code') {
             steps {
                 echo 'Cloning the code from GitHub'
