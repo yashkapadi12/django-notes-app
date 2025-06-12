@@ -2,13 +2,7 @@ pipeline {
     agent any
 
     stages {
-        stage('Clone Code') {
-            steps {
-                echo 'Cloning the code from GitHub'
-                sh 'whoami'
-                git url: 'https://github.com/yashkapadi12/django-notes-app.git', branch: 'main'
-            }
-        }
+        
 
         stage('Build') {
             steps {
