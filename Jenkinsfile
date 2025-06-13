@@ -2,7 +2,12 @@ pipeline {
     agent any
 
     stages {
-        
+        stage('Code Clone') {
+            steps {
+                    echo "Code clonning"
+                    git url: 'https://github.com/yashkapadi12/django-notes-app.git' , branch: 'yashcicd'
+                  }
+        }
 
         stage('Build') {
             steps {
@@ -15,7 +20,6 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running tests'
-                // Add test commands here
             }
         }
 
