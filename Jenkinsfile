@@ -1,52 +1,61 @@
 pipeline {
     agent any
 
-    parameters {
-        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to deploy')
-        choice(name: 'ENVIRONMENT', choices: ['development', 'production'], description: 'Target environment')
-    }
-
     environment {
         IMAGE_NAME = 'notes-app'
     }
 
     stages {
-        stage('Clone Code') {
+        stage('Code Clone') {
             steps {
-                echo "Cloning branch: ${params.BRANCH_NAME}"
-                git url: 'https://github.com/yashkapadi12/django-notes-app.git', branch: "${params.BRANCH_NAME}"
-            }
-        }
-
-        stage('Build Image') {
-            steps {
+                echo "Code cloning"
+                git url: 'https://github.com/yashkapadi12/django-notes-app.git', branch: 'yashcicd'
                 script {
-                    def GIT_HASH = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-                    env.TAG = GIT_HASH
-                    echo "Tagging image as: ${IMAGE_NAME}:${TAG}"
-                    sh "docker build -t ${IMAGE_NAME}:${TAG} ."
+                    GIT_HASH = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                    env.GIT_HASH = GIT_HASH
                 }
             }
         }
 
-        stage('Push Image') {
+        stage('Build') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh 'docker login -u $USER -p $PASS'
-                    sh "docker tag ${IMAGE_NAME}:${TAG} $USER/${IMAGE_NAME}:${TAG}"
-                    sh "docker push $USER/${IMAGE_NAME}:${TAG}"
+                echo 'Building the Docker image'
+                sh 'docker build -t $IMAGE_NAME:$GIT_HASH .'
+                sh 'docker tag $IMAGE_NAME:$GIT_HASH $IMAGE_NAME:latest'
+                echo 'Docker image built and tagged with git hash'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running tests'
+                // Add test command here if any
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                echo 'Pushing Docker image to Docker Hub'
+                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', passwordVariable: 'dockerHubPass', usernameVariable: 'dockerHubUser')]) {
+                    sh 'docker login -u $dockerHubUser -p $dockerHubPass'
+                    sh 'docker tag $IMAGE_NAME:$GIT_HASH $dockerHubUser/$IMAGE_NAME:$GIT_HASH'
+                    sh 'docker tag $IMAGE_NAME:$GIT_HASH $dockerHubUser/$IMAGE_NAME:latest'
+                    sh 'docker push $dockerHubUser/$IMAGE_NAME:$GIT_HASH'
+                    sh 'docker push $dockerHubUser/$IMAGE_NAME:latest'
                 }
+                echo 'Docker image pushed to Docker Hub with git hash and latest tag'
             }
         }
 
         stage('Deploy') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh 'docker login -u $USER -p $PASS'
-                    sh "docker pull $USER/${IMAGE_NAME}:${TAG}"
-                    sh 'docker stop notes-app || true'
-                    sh 'docker rm notes-app || true'
-                    sh "docker run -d --name notes-app $USER/${IMAGE_NAME}:${TAG}"
+                echo 'Deploying application using Docker image from Docker Hub'
+                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', passwordVariable: 'dockerHubPass', usernameVariable: 'dockerHubUser')]) {
+                    sh 'docker login -u $dockerHubUser -p $dockerHubPass'
+                    sh 'docker pull $dockerHubUser/$IMAGE_NAME:$GIT_HASH'
+                    sh 'docker stop $IMAGE_NAME || true'
+                    sh 'docker rm $IMAGE_NAME || true'
+                    sh "docker compose down && docker compose up -d"
                 }
             }
         }
