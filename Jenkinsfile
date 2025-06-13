@@ -4,9 +4,9 @@ pipeline {
     stages {
         stage('Code Clone') {
             steps {
-                    echo "Code clonning"
-                    git url: 'https://github.com/yashkapadi12/django-notes-app.git' , branch: 'yashcicd'
-                  }
+                echo "Code cloning"
+                git url: 'https://github.com/yashkapadi12/django-notes-app.git', branch: 'yashcicd'
+            }
         }
 
         stage('Build') {
@@ -20,6 +20,7 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running tests'
+                // Add test command here if any
             }
         }
 
@@ -37,8 +38,14 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                echo 'Deploying application using Docker Compose'
-                sh 'docker compose down && docker compose up -d'
+                echo 'Deploying application using Docker image from Docker Hub'
+                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', passwordVariable: 'dockerHubPass', usernameVariable: 'dockerHubUser')]) {
+                    sh 'docker login -u $dockerHubUser -p $dockerHubPass'
+                    sh 'docker pull $dockerHubUser/notes-app:latest'
+                    sh 'docker stop notes-app || true'
+                    sh 'docker rm notes-app || true'
+                    sh 'docker compose down && docker compose up -d'
+                }
             }
         }
     }
