@@ -1,50 +1,52 @@
 pipeline {
     agent any
 
+    parameters {
+        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to deploy')
+        choice(name: 'ENVIRONMENT', choices: ['development', 'production'], description: 'Target environment')
+    }
+
+    environment {
+        IMAGE_NAME = 'notes-app'
+    }
+
     stages {
-        stage('Code Clone') {
+        stage('Clone Code') {
             steps {
-                echo "Code cloning"
-                git url: 'https://github.com/yashkapadi12/django-notes-app.git', branch: 'yashcicd'
+                echo "Cloning branch: ${params.BRANCH_NAME}"
+                git url: 'https://github.com/yashkapadi12/django-notes-app.git', branch: "${params.BRANCH_NAME}"
             }
         }
 
-        stage('Build') {
+        stage('Build Image') {
             steps {
-                echo 'Building the Docker image'
-                sh 'docker build -t notes-app:latest .'
-                echo 'Docker image built successfully'
-            }
-        }
-
-        stage('Test') {
-            steps {
-                echo 'Running tests'
-                // Add test command here if any
-            }
-        }
-
-        stage('Push to Docker Hub') {
-            steps {
-                echo 'Pushing Docker image to Docker Hub'
-                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', passwordVariable: 'dockerHubPass', usernameVariable: 'dockerHubUser')]) {
-                    sh 'docker login -u $dockerHubUser -p $dockerHubPass'
-                    sh 'docker tag notes-app:latest $dockerHubUser/notes-app:latest'
-                    sh 'docker push $dockerHubUser/notes-app:latest'
+                script {
+                    def GIT_HASH = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                    env.TAG = GIT_HASH
+                    echo "Tagging image as: ${IMAGE_NAME}:${TAG}"
+                    sh "docker build -t ${IMAGE_NAME}:${TAG} ."
                 }
-                echo 'Docker image pushed to Docker Hub successfully'
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh 'docker login -u $USER -p $PASS'
+                    sh "docker tag ${IMAGE_NAME}:${TAG} $USER/${IMAGE_NAME}:${TAG}"
+                    sh "docker push $USER/${IMAGE_NAME}:${TAG}"
+                }
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Deploying application using Docker image from Docker Hub'
-                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', passwordVariable: 'dockerHubPass', usernameVariable: 'dockerHubUser')]) {
-                    sh 'docker login -u $dockerHubUser -p $dockerHubPass'
-                    sh 'docker pull $dockerHubUser/notes-app:latest'
+                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh 'docker login -u $USER -p $PASS'
+                    sh "docker pull $USER/${IMAGE_NAME}:${TAG}"
                     sh 'docker stop notes-app || true'
                     sh 'docker rm notes-app || true'
-                    sh 'docker compose down && docker compose up -d'
+                    sh "docker run -d --name notes-app $USER/${IMAGE_NAME}:${TAG}"
                 }
             }
         }
